@@ -1,4 +1,4 @@
-#include "./common/head.h"
+#include "head.h"
 
 void copy_file(const char *src,const char *dest){
 	int src_fd,dest_fd;
