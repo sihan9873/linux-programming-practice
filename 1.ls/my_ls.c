@@ -1,0 +1,192 @@
+#include "./common/head.h"
+#define MAXNAME 256
+#define MAXFILE 1024
+
+// ls -al
+
+// 定义成全局变量
+// 实际功能会封装成函数
+// 全局变量会提高可读性和可拓展性
+int l_flag=0;
+int a_flag=0;
+
+void do_ls(const char* dir);
+
+int main(int argc,char** argv){
+	int opt;
+	while((opt = getopt(argc,argv,"la")) != -1){
+		switch(opt){
+			case 'l':
+				l_flag = 1;
+				break;
+			case 'a':
+				a_flag=1;
+				break;
+			default:
+				fprintf(stderr,"Usage: %s [-al]!\n",argv[0]);
+				exit(1);
+		}
+	}
+	
+	// optind配套getopt使用,定义域头文件中,直接使用,称之为内置变量
+	DBG(YELLOW"<D>"NONE": optind = %d\n",optind);
+	DBG(YELLOW"<D>"NONE": l_flag = %d,a_flag = %d\n",l_flag,a_flag);
+	DBG(YELLOW"<D>"NONE": argv[optind] = %s\n",argv[optind]);
+	DBG(YELLOW"<D>"NONE": argv[0] = %s\n",argv[0]);	
+
+	// 获取参数数量
+	argc -= optind;
+	// 地址移动到参数所在位置
+	argv += optind;	
+	DBG(YELLOW"<D>"NONE": *(argv) = %s\n",*(argv));
+	
+	if(argc == 0){
+		DBG(YELLOW"<D>"NONE": Doing with The Current Dir. \n");
+		do_ls(".");
+	}else{
+		while(argc--){
+			do_ls(*(argv++));
+			DBG(YELLOW"<D>"NONE": Doing with %s\n",*(argv-1));
+			
+		}
+	}
+
+
+	return 0;
+}
+
+int cmp_name(const void* _a,const void* _b){
+	char *a = (char *)_a;
+	char *b = (char *)_b;
+	for(int i=0;i<strlen(a);i++){
+		a[i] = tolower(a[i]); 
+	}
+	for(int i=0;i<strlen(b);i++){
+        b[i] = tolower(b[i]);
+    }
+	return strcmp(a,b);
+}
+
+void size_window(char names[][MAXNAME],int cnt,int *row,int *col){
+	struct winsize ws;
+	// 总长度中间变量
+	int total_len = 0, max = 0,len[MAXFILE] = {0};
+	if(ioctl(STDOUT_FILENO,TIOCGWINSZ,&ws) < 0){
+		perror("ioctl");
+		exit(1);
+	}
+	DBG(YELLOW"<D>"NONE":winsize.col = %d, winsize.row = %d\n",ws.ws_col,ws.ws_row);
+	// 一行:所有名字的长度之和不满足一行
+	// 一列:某个文件的名字长度超过一行
+	for(int i = 0;i < cnt;i++){
+		len[i]=strlen(names[i]);
+		if(max < len[i]){
+			max = len[i];
+		}
+		total_len += len[i]+2;//还有空格
+	}
+	// 一列
+	if(max+2 >= ws.ws_col){
+		*row = cnt;
+		*col = 1;
+		return;
+	}
+	// 一行
+	if(total_len < ws.ws_col){
+		*row = 1;
+		*col = cnt;
+		return;
+	}
+	// 尝试可能的最大列数
+	int try_begin = 0;
+	for(int i = 0,tmp = 0;i < cnt;i++){
+		tmp += len[i]+2;
+		if(tmp > ws.ws_col){
+			try_begin = i;
+			break;
+		}
+	}
+
+	DBG(YELLOW"<D>"NONE": try_begin is %d.\n",try_begin);
+	
+	// 下面这段代码可读性太差了,需要重新写
+
+	// 尝试列
+	for(int i = try_begin;;i--){
+		// 具体用法见126行 
+		int *wide = (int*)malloc(sizeof(int)*i);
+		int sum = 0;
+		memset(wide,0,sizeof(int)*i);
+		// 此处已根据列的循环变量修改行数,记得向上取整
+		*row = ceil(cnt*1.0/i);
+		// x循环列数
+		for(int x=0;x<i;x++){
+			// y遍历一列中的每一行
+			for(int y=x * (*row);y < (x+1) * (*row) && y < cnt;y++){
+				// 找出某一列中最宽的那一行
+				if(wide[x] < len[y]){
+					wide[x] = len[y];
+				}
+			}
+			sum += wide[x] + 2;   
+		}
+		if(sum > ws.ws_col)
+			continue;
+		if(sum <= ws.ws_col){
+			*col = i;
+			break;
+		}
+	}
+	
+	DBG(YELLOW"<D>"NONE": file will put in %d * %d window.\n",*row,*col);	
+
+	return;
+}
+
+void do_ls(const char* dir){
+	DIR *dirp = NULL;
+	struct dirent *direntp;
+	if((dirp = opendir(dir)) == NULL){
+		// 检查是否有权限
+		if(access(dir,R_OK) == 0){
+			// 有权限但没打开,说明是文件
+			// 参数中有的文件,没有-a也显示(特别是隐藏文件)
+			// -l 长显示
+			if(l_flag == 1){
+				struct stat tmp_st;
+				lstat(dir,&tmp_st);
+				DBG(PINK"<ToDo>"NONE": show [%s] with long format.\n",dir);
+			}else{
+				printf("%s\n",dir); 
+			}
+		}else{
+			perror(dir);
+			exit(1);
+		}
+	}else{
+		char names[MAXFILE][MAXNAME] = {0};
+		int cnt = 0;
+		// 读取,保存目录项,以便于排序
+		while((direntp = readdir(dirp)) != NULL){
+			if(direntp->d_name[0] == '.' && (a_flag == 0)){
+				continue;
+			}
+			strcpy(names[cnt++],direntp->d_name);
+		}
+		// sort
+		qsort(names,cnt,MAXNAME,cmp_name);
+
+		if(l_flag == 1){				
+			DBG(PINK"<ToDo>"NONE": show files in %s with long format.\n",dir);
+			
+		}else{
+			int row,col;
+			size_window(names,cnt,&row,&col);
+			DBG(PINK"<ToDo>"NONE": show files in %s.\n",dir);
+			
+		}
+	}
+}
+
+
+

@@ -9,6 +9,12 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <utime.h>
+#include <dirent.h>
+#include <ctype.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <math.h>
+
 #include "common.h"
 #include "color.h"
 
