@@ -10,6 +10,8 @@
 int l_flag=0;
 int a_flag=0;
 
+int bg_c,fg_c;
+
 void do_ls(const char* dir);
 
 int main(int argc,char** argv){
@@ -143,6 +145,67 @@ void size_window(char names[][MAXNAME],int cnt,int *row,int *col){
 	return;
 }
 
+void update_color(mode_t mode){
+	bg_c = 0;
+	fg_c = 37;
+
+	if(mode & (S_IXUSR | S_IXGRP | S_IXOTH)){
+		fg_c = 32;
+	}
+
+	switch(mode & S_IFMT){
+		case S_IFDIR:
+			fg_c = 34; 
+			break;
+		case S_IFLNK:
+            fg_c = 36;
+            break;
+	}
+
+	return;
+}
+
+void show_files(const char* dir,char names[][MAXNAME],int cnt,int row,int col){
+	int wide[col];
+	memset(wide,0,sizeof(int)*col);
+	
+	// 计算每列的最大宽度
+	for(int i = 0;i < col;i++){
+		for(int j = i * row;j < (i+1) * row && j < cnt;j++){
+			if(wide[i] < strlen(names[j])){
+				wide[i] = strlen(names[j]); 
+			}
+		}
+	}
+
+	// 打印	
+//	for(int i = 0;i < row; i++){
+//		for(int j = i; j < (row * col) + i && j < cnt;j += row){
+//			printf("%-*s",wide[j/row]+2,names[j]);
+//		} 
+//		printf("\n");
+//	}
+
+	for(int i = 0;i < row; i++){
+    	for(int j = 0; j < col;j++){
+			int ind = i + j * row;
+			if(ind >= cnt){
+				break;
+			}
+			struct stat t_st;
+			// 此处需要完整路径
+			char pathname[MAXNAME*2] = {0};
+			sprintf(pathname,"%s/%s",dir,names[ind]);
+			lstat(pathname, &t_st);
+			update_color(t_st.st_mode);
+            printf("\e[%d;%dm%-*s"NONE,bg_c,fg_c,wide[j]+2,names[ind]);
+        }
+        printf("\n");
+    }
+	
+	return;
+}
+
 void do_ls(const char* dir){
 	DIR *dirp = NULL;
 	struct dirent *direntp;
@@ -182,8 +245,8 @@ void do_ls(const char* dir){
 		}else{
 			int row,col;
 			size_window(names,cnt,&row,&col);
+			show_files(dir,names,cnt,row,col);
 			DBG(PINK"<ToDo>"NONE": show files in %s.\n",dir);
-			
 		}
 	}
 }
