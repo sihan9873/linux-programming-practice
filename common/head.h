@@ -14,6 +14,10 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <math.h>
+#include <pwd.h>
+#include <grp.h>
+#include <time.h>
+#include <stdarg.h>
 
 #include "common.h"
 #include "color.h"
