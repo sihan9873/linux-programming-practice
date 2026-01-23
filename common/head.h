@@ -19,6 +19,8 @@
 #include <time.h>
 #include <stdarg.h>
 #include <sys/wait.h>
+#include <sys/file.h>
+#include <sys/resource.h>
 
 #include "common.h"
 #include "color.h"
