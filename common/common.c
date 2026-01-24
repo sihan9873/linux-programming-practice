@@ -100,7 +100,7 @@ int mypclose(FILE* fp){
 	if(wait4(pid,&status,0,&usage) < 0){
 		return -1;
 	}
-	DBG(GREEN"User time: %ld.%ld",usage.ru_utime.tv_sec,usage.ru_utime.tv_usec);
+	DBG(GREEN"User time: %ld.%06ld\n",usage.ru_utime.tv_sec,usage.ru_utime.tv_usec);
 
 	return status;
 }
