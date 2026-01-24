@@ -21,6 +21,8 @@
 #include <sys/wait.h>
 #include <sys/file.h>
 #include <sys/resource.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
 
 #include "common.h"
 #include "color.h"
