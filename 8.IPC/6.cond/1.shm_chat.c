@@ -9,7 +9,8 @@
 //单独的内存难以加锁,于是用结构体实现
 typedef struct {
 	char msg[MSG_SIZE];
-	pthread_mutex_t mutex;	
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;	
 	int need_init;
 } shared_memory_t;
 
@@ -22,11 +23,22 @@ void init_sync_data(shared_memory_t* shm){
 	pthread_mutexattr_init(&mutex_attr);
 	pthread_mutexattr_setpshared(&mutex_attr,PTHREAD_PROCESS_SHARED);
 	pthread_mutex_init(&shm->mutex,&mutex_attr);
+	
+	pthread_condattr_t cond_attr;
+    pthread_condattr_init(&cond_attr);
+    pthread_condattr_setpshared(&cond_attr,PTHREAD_PROCESS_SHARED);
+    pthread_cond_init(&shm->cond,&cond_attr);   
+
 	memset(shm->msg,0,MSG_SIZE);
-	shm->need_init == NEED;
+	shm->need_init = NEED;
 }
 
-int main(){
+int main(int argc,char** argv){
+	if(argc != 2 || (strcmp(argv[1],"read") != 0 && strcmp(argv[1],"write") != 0)){
+		fprintf(stderr,"Usage: %s [read|write]\n",argv[0]);
+		exit(1);
+	}
+
 	key_t key = ftok(SHM_KEY_PATH,SHM_PROJ_ID);
 	if(key == -1){
 		perror("ftok");
@@ -49,34 +61,36 @@ int main(){
 
 	init_sync_data(shm_ptr);
 
-	char cmd;
-	int ch;
- 	while(1){
-		printf("请输入指令[r|w|q]:\n");	
-		scanf("%c",&cmd);
-		while((ch = getchar()) != '\n' && ch != EOF);
-
-		if(cmd == 'r'){
-			pthread_mutex_lock(&shm_ptr->mutex);
-			printf("MSG:%s\n",shm_ptr->msg);
-			pthread_mutex_unlock(&shm_ptr->mutex);
-		}else if(cmd == 'w'){
-			printf("请输入内容:\n");
-			int ret = pthread_mutex_lock(&shm_ptr->mutex);
-			printf("ret = %d\n",ret);
-			if(fgets(shm_ptr->msg,MSG_SIZE-1,stdin) != NULL){
-				printf(GREEN"写入成功\n"NONE);
+	if(strcmp(argv[1],"write") == 0){
+		while(1){
+			char input[MSG_SIZE];
+			printf("请输入数据(q退出):\n");
+			fgets(input,MSG_SIZE,stdin);
+			if(strncmp(input,"q",1) == 0){
+				break;
 			}
+
+			pthread_mutex_lock(&shm_ptr->mutex);
+			strncpy(shm_ptr->msg,input,MSG_SIZE);
+			pthread_cond_signal(&shm_ptr->cond);
 			pthread_mutex_unlock(&shm_ptr->mutex);
-		}else if(cmd == 'q'){
-			break;
-		}else{
-			printf(RED"无效的操作!\n"NONE);
+		}
+	}else{
+		while(1){
+			pthread_mutex_lock(&shm_ptr->mutex);
+			while(!strlen(shm_ptr->msg)){
+				pthread_cond_wait(&shm_ptr->cond,&shm_ptr->mutex);
+			}
+			printf("RECV: %s",shm_ptr->msg);
+			memset(&shm_ptr->msg,0,MSG_SIZE);
+			pthread_mutex_unlock(&shm_ptr->mutex);
 		}
 	}
 
 	shmdt(shm_ptr);
-	shmctl(shmid,IPC_RMID,NULL);
+	if (strcmp(argv[1], "write") == 0) {
+		shmctl(shmid,IPC_RMID,NULL);
+	}
 
 	return 0;
 }
