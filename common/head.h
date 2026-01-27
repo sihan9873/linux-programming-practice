@@ -23,6 +23,7 @@
 #include <sys/resource.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
+#include <pthread.h>
 
 #include "common.h"
 #include "color.h"
