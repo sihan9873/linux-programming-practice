@@ -24,6 +24,7 @@
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <pthread.h>
+#include <sys/msg.h>
 
 #include "common.h"
 #include "color.h"
