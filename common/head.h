@@ -26,6 +26,8 @@
 #include <pthread.h>
 #include <sys/msg.h>
 #include <errno.h>
+#include <sys/sem.h>
+#include <semaphore.h>
 
 #include "common.h"
 #include "color.h"
