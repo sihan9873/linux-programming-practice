@@ -25,6 +25,7 @@
 #include <sys/ipc.h>
 #include <pthread.h>
 #include <sys/msg.h>
+#include <errno.h>
 
 #include "common.h"
 #include "color.h"
